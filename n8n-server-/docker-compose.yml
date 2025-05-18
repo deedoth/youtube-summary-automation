@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "1212:1212"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      # - N8N_BASIC_AUTH_USER=admin
+      # - N8N_BASIC_AUTH_PASSWORD=your_secure_password
+      - N8N_HOST=n8n
+      - N8N_PORT=1212
+      - WEBHOOK_URL=http://n8n:1212
+      # - WEBHOOK_URL=https://7cf8-102-89-68-196.ngrok-free.app
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../downloads:/downloads
+    restart: always
+
+  whisper:
+    build:
+      context: ../whisper-api-server
+    ports:
+      - "3000:3000"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../downloads:/downloads
+    restart: always
+
+volumes:
+  n8n_data:

@@ -1,0 +1,53 @@
+Goal:
+Take youtube link
+Extract the audio
+Transcribe
+
+
+
+Running Ollama
+Install Ollama & Minstral
+
+
+Troubleshoot
+✅ 1. Is Ollama running?
+Run this in PowerShell or CMD:
+
+ollama list
+
+If it fails, Ollama isn't running. Start it with:
+
+
+🟢 Option 1: Run a model (this starts the server)
+
+ollama run mistral
+This will load the model into memory and keep the API server running as long as the session is active.
+
+🟢 Option 2: Run the background server manually
+To start the Ollama server in the background, open a terminal and run:
+
+ollama serve
+
+
+Since Ollama is already running, test with:
+
+curl http://localhost:11434/api/tags
+If you see a list of models (like mistral, llama3, etc.), then the API is active and ready.
+
+
+🧪 Next Step: Test From Inside Docker (n8n)
+
+To find your container name, you can run this command:
+
+docker ps
+
+Open a terminal to your n8n Docker container:
+
+docker exec -it <your_n8n_container_name> sh
+docker exec -it n8n-server--n8n-1 sh
+
+....................
+Then run:
+
+curl http://host.docker.internal:11434/api/tags
+If that works, you're 100% ready to integrate with n8n.

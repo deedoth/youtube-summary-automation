@@ -1,0 +1,464 @@
+{
+  "name": "Youtube-to-Text-Original",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "youtube-to-text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7ccaa93c-1a9c-4a71-89a8-f42335b31e20",
+      "name": "Webhook",
+      "webhookId": "f94112c1-f5d2-40ec-8b40-ea7555836fa4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b37660db-8611-4ad5-96ac-8fc087845afa",
+              "name": "Youtube-Link",
+              "value": "={{ $json.body.link }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        20,
+        260
+      ],
+      "id": "12e5cfac-6895-4be9-b04f-7eaed8c5738e",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.stdout }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        580,
+        20
+      ],
+      "id": "b241f0ae-ad19-4cbb-abf0-d7b5b5c6e002",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:11434/api/generate",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Content-Type\": \"application/json\"\n}\n",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"mistral\",\n  \"prompt\": \"Summarize the following transcript without losing important information:\\n\\n{{ $json.transcription }}\",\n  \"stream\": false\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -560
+      ],
+      "id": "69fc84f2-b50b-4930-80e6-291ce91243c1",
+      "name": "HTTP Request4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a4a72227-df54-45ca-b578-e825171355f2",
+              "name": "Transcript",
+              "value": "={{ $json.transcription }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        580,
+        260
+      ],
+      "id": "0039d155-f668-44fa-b27f-701310e71268",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Prompt: \"Summarize the following transcript into 3 paragraphs without losing important information:\\n\\n {{ $json.chunk }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        1640,
+        80
+      ],
+      "id": "e0c80847-693d-4d94-9143-6fd0ca5befd0",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        300
+      ],
+      "id": "5a20b14c-3a8f-4f68-b05d-13421ca7be9f",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "pDZgu7hzaozW8Hto",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=/venv/bin/yt-dlp \\\n  -f bestaudio \\\n  --extract-audio \\\n  --audio-format mp3 \\\n  -o \"/downloads/%(title)s.%(ext)s\" \\\n  --print after_move:filepath \\\n  \"{{ $json['Youtube-Link'] }}\"\n"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        340,
+        20
+      ],
+      "id": "449a639c-8b6e-4274-b246-506a2db2ee05",
+      "name": "Extract Audio (Execute)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://whisper:3000/transcribe",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 2900000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        340,
+        260
+      ],
+      "id": "4144ebc0-9e59-4c57-bd49-3385f26e6713",
+      "name": "Transcribe (Request)",
+      "notesInFlow": false,
+      "executeOnce": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "95c2b105-3237-4cc3-a012-689d87cb7e6b",
+              "name": "",
+              "value": "=const fullText = {{ $json.Transcript }};\nconst chunkSize = 1000;\nconst chunks = [];\n\nfor (let i = 0; i < fullText.length; i += chunkSize) {\n  chunks.push(fullText.slice(i, i + chunkSize));\n}\n\nreturn chunks.map(chunk => ({\n  json: {\n    chunk\n  }\n}));\n",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        940,
+        -420
+      ],
+      "id": "133fa0eb-c4bf-4cb8-80eb-adb1663609a9",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1100,
+        100
+      ],
+      "id": "3ad587a0-a539-41b9-8eea-0d6d6e358ff7",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        220
+      ],
+      "id": "6d4563dd-2ec7-4c42-80d1-d578c7f6ff92"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        2040,
+        100
+      ],
+      "id": "984fc87e-c847-41fe-b506-17f4579516db",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fullText = $input.first().json.Transcript;\nconst chunkSize = 1000;\nconst chunks = [];\n\nfor (let i = 0; i < fullText.length; i += chunkSize) {\n  chunks.push({\n    json: {\n      chunk: fullText.slice(i, i + chunkSize)\n    }\n  });\n}\n\nreturn chunks;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        100
+      ],
+      "id": "9e2ce364-58cd-455e-baa9-6a99d1fbc696",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        2360,
+        300
+      ],
+      "id": "dc1d08a1-3241-46ba-9b27-beb62646a972",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "pDZgu7hzaozW8Hto",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=merge and do light summary if necessary to this output: {{ $json.output }}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        2320,
+        80
+      ],
+      "id": "d0b20b23-2b10-4fbd-aa31-564c72acd617",
+      "name": "AI Agent1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Extract Audio (Execute)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Transcribe (Request)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request4": {
+      "main": [
+        []
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Audio (Execute)": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcribe (Request)": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        []
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ec80f18e-5de7-4f7c-96a7-2204b31ebb6f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "66effba0f9707ef36a034df164faab6410babb28962e4db363b141e11dcf4bef"
+  },
+  "id": "HdwOLRDnHxpWuFG7",
+  "tags": []
+}

@@ -1,0 +1,60 @@
+Dockerfile:
+FROM python:3.10-slim
+
+# System dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set workdir
+WORKDIR /app
+
+# Copy files
+COPY requirements.txt .
+COPY app.py .
+
+# Install Python deps
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Run the app
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "5000"]
+
+
+
+-----------------------------
+
+Step 2
+requirements.txt
+faster-whisper
+uvicorn
+fastapi
+python-multipart  # for file upload support
+
+---------------------
+
+Step 3:
+app.py
+from fastapi import FastAPI, File, UploadFile
+from faster_whisper import WhisperModel
+
+app = FastAPI()
+model = WhisperModel("base")  # or "medium", "large", etc.
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    audio_data = await file.read()
+    with open("temp_audio.mp3", "wb") as f:
+        f.write(audio_data)
+
+    segments, info = model.transcribe("temp_audio.mp3")
+    text = " ".join(segment.text for segment in segments)
+    return {"transcription": text}
+
+
+-------------------------
+
+Step 2: Build and Run
+docker build -t whisper-api .
+docker run -p 5000:5000 whisper-api
+// Now your Whisper API is running at http://localhost:5000/transcribe.
+
